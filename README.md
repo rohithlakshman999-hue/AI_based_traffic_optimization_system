@@ -1,3 +1,16 @@
+---
+title: UrbanFlow AI
+emoji: 🚑
+colorFrom: cyan
+colorTo: green
+sdk: streamlit
+sdk_version: 1.64.0
+app_file: app_futuristic.py
+python_version: 3.11
+suggested_hardware: t4-small
+pinned: false
+---
+
 # 🚦 UrbanFlow AI
 **Lane-Aware Adaptive Traffic Optimization System**  
 *AI4Dev '26 Hackathon Submission*
