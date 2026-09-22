@@ -26,7 +26,7 @@ This application performs:
 UrbanFlow AI - Lane-Aware Adaptive Traffic Optimization System
 AI4Dev '26 Hackathon Submission
 
-Author: G Rohith Lakshman 
+Author: G Rohith Lakshman 4
 
 Description:
 - Real-time vehicle detection using YOLOv8 Nano
@@ -41,6 +41,7 @@ import cv2
 import torch
 import math
 import time
+import tempfile
 from ultralytics import YOLO
 import numpy as np
 
@@ -63,9 +64,22 @@ def load_model():
 model, device = load_model()
 
 # =========================================================
-# VIDEO SOURCE
+# INPUT SOURCE
 # =========================================================
-VIDEO_PATH = "signal.mp4"  # Replace with your sample video name
+source_type = st.radio("Choose detection input", ["Video", "Image"], horizontal=True)
+uploaded_video = None
+uploaded_image = None
+
+if source_type == "Video":
+    uploaded_video = st.file_uploader(
+        "Upload a traffic video",
+        type=["mp4", "avi", "mov"],
+    )
+else:
+    uploaded_image = st.file_uploader(
+        "Upload a traffic image",
+        type=["jpg", "jpeg", "png"],
+    )
 
 # =========================================================
 # DASHBOARD LAYOUT
@@ -80,14 +94,92 @@ with col2:
     signal_metric = st.empty()
     fps_metric = st.empty()
 
-start_button = st.button("▶ Start Monitoring")
+start_button = st.button(
+    "▶ Start Monitoring",
+    disabled=source_type != "Video" or uploaded_video is None,
+)
+image_button = st.button(
+    "🔍 Detect Uploaded Image",
+    disabled=source_type != "Image" or uploaded_image is None,
+)
+
+
+def detect_image(image):
+    """Run the dashboard detection pipeline on one image."""
+    image = cv2.resize(image, (1280, 720))
+    height, width = image.shape[:2]
+    center_x_lane = int(width * 0.35)
+    center_y_lane = height // 2
+    angle = -34
+    length = height
+    dx = int(length * math.sin(math.radians(angle)))
+    dy = int(length * math.cos(math.radians(angle)))
+    x1, y1 = center_x_lane - dx, center_y_lane - dy
+    x2, y2 = center_x_lane + dx, center_y_lane + dy
+
+    line_critical = 100
+    line_high = 350
+    line_normal = 550
+    max_depth_right_lane = 0
+    right_lane_vehicle_count = 0
+    results = model(image, verbose=False)[0]
+
+    for box in results.boxes:
+        label = model.names[int(box.cls[0])]
+        if label not in ["car", "truck", "bus", "motorcycle"]:
+            continue
+
+        x_min, y_min, x_max, y_max = map(int, box.xyxy[0])
+        center_x_vehicle = (x_min + x_max) // 2
+        bottom_y = y_max
+        in_right_lane = (center_x_vehicle - x1) * (y2 - y1) - (bottom_y - y1) * (x2 - x1) > 0
+        if in_right_lane:
+            right_lane_vehicle_count += 1
+            max_depth_right_lane = max(max_depth_right_lane, bottom_y)
+            cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+            confidence = round(float(box.conf[0]) * 100, 1)
+            cv2.putText(image, f"{label.upper()} {confidence}%", (x_min, max(y_min - 10, 20)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+    if max_depth_right_lane < line_critical:
+        density, signal_time, color = "NORMAL", 30, (0, 255, 0)
+    elif max_depth_right_lane < line_high:
+        density, signal_time, color = "HIGH", 60, (0, 255, 255)
+    else:
+        density, signal_time, color = "VERY HIGH", 90, (0, 0, 255)
+
+    cv2.line(image, (x1, y1), (x2, y2), (255, 255, 255), 3)
+    cv2.line(image, (0, line_critical), (width, line_critical), (0, 0, 255), 2)
+    cv2.line(image, (0, line_high), (width, line_high), (0, 255, 255), 2)
+    cv2.line(image, (0, line_normal), (width, line_normal), (0, 255, 0), 2)
+    cv2.putText(image, f"Density: {density}", (40, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
+    return image, right_lane_vehicle_count, density, signal_time
+
+
+if image_button:
+    image_data = np.frombuffer(uploaded_image.getvalue(), dtype=np.uint8)
+    image = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
+    if image is None:
+        st.error("Unable to read the uploaded image.")
+    else:
+        detected_image, vehicle_count, density, signal_time = detect_image(image)
+        video_placeholder.image(cv2.cvtColor(detected_image, cv2.COLOR_BGR2RGB),
+                                channels="RGB", use_container_width=True)
+        vehicle_metric.metric("🚗 Vehicles (Right Lane)", vehicle_count)
+        density_metric.metric("🚦 Density Level", density)
+        signal_metric.metric("⏱ Signal Time", f"{signal_time} sec")
+        fps_metric.metric("⚡ FPS", "Image")
 
 # =========================================================
 # MAIN EXECUTION
 # =========================================================
 if start_button:
 
-    cap = cv2.VideoCapture(VIDEO_PATH)
+    video_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    video_file.write(uploaded_video.getvalue())
+    video_file.close()
+
+    cap = cv2.VideoCapture(video_file.name)
 
     if not cap.isOpened():
         st.error("Error: Unable to open video file.")

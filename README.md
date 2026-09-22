@@ -38,8 +38,8 @@ Urban intersections often use fixed signal timers that fail to adapt to real-tim
 
 **Step 1: Clone Repository**
 ```bash
-git clone https://github.com/rohithlakshman999-hue/AI_based_traffic_optimization_system.git
-cd AI_based_traffic_optimization_system
+git clone https://github.com/rohithlakshman999-hue/HackZen-UrbanFlow-AI.git
+cd HackZen-UrbanFlow-AI
 ```
 
 **Step 2: Create Virtual Environment**
@@ -59,10 +59,7 @@ streamlit run app_futuristic.py
 ```
 
 ## 📦 Model Information
-This project uses the YOLOv8 model for real-time inference. The model downloads automatically during the first run if it is not already cached.
-
-## ☁️ Streamlit Cloud Deployment
-Create a new Streamlit app from this repository and set the main file to `app_futuristic.py`. The included `signal.mp4` file is the demo video processed by the dashboard.
+This project uses the YOLOv8 model for real-time inference. The model will automatically download during the first run if not available.
 
 ## 🎥 Demo Video
 Watch working prototype here:
@@ -84,8 +81,8 @@ UrbanFlow-AI-Traffic-Optimization/
 
 ## ⚠️ Notes
 - Virtual environment (venv) not included.
-- Model weights (.pt) are downloaded automatically and are not included in git.
-- The required demo video `signal.mp4` is included.
+- Model weights (.pt) not included.
+- Sample videos not included.
 - Designed for demonstration purposes.
 
 ## 👤 Author

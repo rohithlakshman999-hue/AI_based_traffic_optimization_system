@@ -3,7 +3,6 @@ import cv2
 import torch
 import math
 import time
-from pathlib import Path
 from ultralytics import YOLO
 import numpy as np
 
@@ -206,10 +205,7 @@ st.markdown(header_html, unsafe_allow_html=True)
 @st.cache_resource
 def load_model():
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model_path = Path(__file__).with_name("yolov8n.pt")
-    if not model_path.exists():
-        raise FileNotFoundError(f"YOLO model not found: {model_path.name}")
-    model = YOLO(str(model_path))
+    model = YOLO("yolov8n.pt")
     model.to(device)
     return model, device
 
@@ -383,7 +379,6 @@ if start_button:
     else:
         frame_counter = 0
         start_time = time.time()
-        display_every = 3
 
         while cap.isOpened():
             ret, frame = cap.read()
@@ -465,15 +460,10 @@ if start_button:
 
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            if frame_counter % display_every == 0:
-                video_placeholder.image(
-                    frame_rgb,
-                    channels="RGB",
-                    output_format="JPEG",
-                    use_container_width=True,
-                )
-                detection_status_ph.markdown(render_detection_status(density, signal_time, ambulance_detected), unsafe_allow_html=True)
-                performance_metrics_ph.markdown(render_performance_metrics(fps, right_lane_vehicle_count), unsafe_allow_html=True)
-                time.sleep(0.03)
+            video_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
+            detection_status_ph.markdown(render_detection_status(density, signal_time, ambulance_detected), unsafe_allow_html=True)
+            performance_metrics_ph.markdown(render_performance_metrics(fps, right_lane_vehicle_count), unsafe_allow_html=True)
+
+            time.sleep(0.01)
 
         cap.release()

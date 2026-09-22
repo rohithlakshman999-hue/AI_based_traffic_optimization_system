@@ -56,7 +56,7 @@ st.title("🚦 UrbanFlow AI - Lane One Traffic Dashboard")
 @st.cache_resource
 def load_model():
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = YOLO("yolov8s.pt")  # Auto-downloads if missing
+    model = YOLO("yolo11m.pt")  # Auto-downloads if missing
     model.to(device)
     return model, device
 

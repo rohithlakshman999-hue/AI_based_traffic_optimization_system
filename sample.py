@@ -7,8 +7,8 @@ import streamlit as st
 import cv2
 import torch
 import math
-import time
-import tempfile
+import os
+import numpy as np
 from ultralytics import YOLO
 
 # =========================================================
@@ -30,9 +30,9 @@ def load_model():
 model, device = load_model()
 
 # =========================================================
-# FILE UPLOAD
+# IMAGE SOURCE
 # =========================================================
-uploaded_file = st.file_uploader("📤 Upload Traffic Video", type=["mp4", "avi", "mov"])
+IMAGE_PATH = "signal.jpg"
 
 # =========================================================
 # UI LAYOUT
@@ -47,139 +47,112 @@ with col2:
     signal_metric = st.empty()
     fps_metric = st.empty()
 
-start = st.button("▶ Start Monitoring")
+start = st.button("🔍 Detect Image")
 
 # =========================================================
 # MAIN EXECUTION
 # =========================================================
 if start:
-
-    if uploaded_file is None:
-        st.warning("⚠ Please upload a video first!")
+    if not os.path.exists(IMAGE_PATH):
+        st.error(f"❌ Image not found: {IMAGE_PATH}")
         st.stop()
 
-    # Save uploaded file temporarily
-    tfile = tempfile.NamedTemporaryFile(delete=False)
-    tfile.write(uploaded_file.read())
+    frame = cv2.imread(IMAGE_PATH)
 
-    cap = cv2.VideoCapture(tfile.name)
-
-    if not cap.isOpened():
-        st.error("❌ Error opening video")
+    if frame is None:
+        st.error("❌ Unable to read the uploaded image")
         st.stop()
 
-    frame_counter = 0
-    start_time = time.time()
+    frame = cv2.resize(frame, (1280, 720))
+    height, width = frame.shape[:2]
 
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
+    # =====================================================
+    # LANE GEOMETRY
+    # =====================================================
+    center_x_lane = int(width * 0.37)
+    center_y_lane = height // 2
+    angle = -34
+    length = height
 
-        frame = cv2.resize(frame, (1280, 720))
-        height, width = frame.shape[:2]
+    dx = int(length * math.sin(math.radians(angle)))
+    dy = int(length * math.cos(math.radians(angle)))
 
-        # =====================================================
-        # LANE GEOMETRY
-        # =====================================================
-        center_x_lane = int(width * 0.37)
-        center_y_lane = height // 2
-        angle = -34
-        length = height
+    x1 = center_x_lane - dx
+    y1 = center_y_lane - dy
+    x2 = center_x_lane + dx
+    y2 = center_y_lane + dy
 
-        dx = int(length * math.sin(math.radians(angle)))
-        dy = int(length * math.cos(math.radians(angle)))
+    # =====================================================
+    # QUEUE THRESHOLDS
+    # =====================================================
+    LINE_CRITICAL = 100
+    LINE_HIGH = 350
+    LINE_NORMAL = 550
 
-        x1 = center_x_lane - dx
-        y1 = center_y_lane - dy
-        x2 = center_x_lane + dx
-        y2 = center_y_lane + dy
+    max_depth = 0
+    vehicle_count = 0
 
-        # =====================================================
-        # QUEUE THRESHOLDS
-        # =====================================================
-        LINE_CRITICAL = 100
-        LINE_HIGH = 350
-        LINE_NORMAL = 550
+    # =====================================================
+    # YOLO INFERENCE (GPU ENABLED)
+    # =====================================================
+    results = model(frame, conf=0.25, device=device, verbose=False)[0]
 
-        max_depth = 0
-        vehicle_count = 0
+    for box in results.boxes:
+        cls = int(box.cls[0])
+        label = model.names[cls]
 
-        # =====================================================
-        # YOLO INFERENCE (GPU ENABLED)
-        # =====================================================
-        results = model(frame, conf=0.25, device=device, verbose=False)[0]
+        if label in ["car", "truck", "bus", "motorcycle"]:
 
-        for box in results.boxes:
-            cls = int(box.cls[0])
-            label = model.names[cls]
+            x_min, y_min, x_max, y_max = map(int, box.xyxy[0])
+            center_x = (x_min + x_max) // 2
+            bottom_y = y_max
 
-            if label in ["car", "truck", "bus", "motorcycle"]:
+            # Lane check
+            if (center_x - x1) * (y2 - y1) - (bottom_y - y1) * (x2 - x1) > 0:
 
-                x_min, y_min, x_max, y_max = map(int, box.xyxy[0])
-                center_x = (x_min + x_max) // 2
-                bottom_y = y_max
+                vehicle_count += 1
 
-                # Lane check
-                if (center_x - x1) * (y2 - y1) - (bottom_y - y1) * (x2 - x1) > 0:
+                if bottom_y > max_depth:
+                    max_depth = bottom_y
 
-                    vehicle_count += 1
+                cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
 
-                    if bottom_y > max_depth:
-                        max_depth = bottom_y
+    # =====================================================
+    # DENSITY LOGIC
+    # =====================================================
+    if max_depth < LINE_CRITICAL:
+        density = "NORMAL"
+        signal_time = 30
+        color = (0, 255, 0)
 
-                    cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+    elif max_depth < LINE_HIGH:
+        density = "HIGH"
+        signal_time = 60
+        color = (0, 255, 255)
 
-        # =====================================================
-        # DENSITY LOGIC
-        # =====================================================
-        if max_depth < LINE_CRITICAL:
-            density = "NORMAL"
-            signal_time = 30
-            color = (0, 255, 0)
+    else:
+        density = "VERY HIGH"
+        signal_time = 90
+        color = (0, 0, 255)
 
-        elif max_depth < LINE_HIGH:
-            density = "HIGH"
-            signal_time = 60
-            color = (0, 255, 255)
+    # =====================================================
+    # DRAWING
+    # =====================================================
+    cv2.line(frame, (x1, y1), (x2, y2), (255, 255, 255), 3)
 
-        else:
-            density = "VERY HIGH"
-            signal_time = 90
-            color = (0, 0, 255)
+    cv2.line(frame, (0, LINE_CRITICAL), (width, LINE_CRITICAL), (0, 0, 255), 2)
+    cv2.line(frame, (0, LINE_HIGH), (width, LINE_HIGH), (0, 255, 255), 2)
+    cv2.line(frame, (0, LINE_NORMAL), (width, LINE_NORMAL), (0, 255, 0), 2)
 
-        # =====================================================
-        # DRAWING
-        # =====================================================
-        cv2.line(frame, (x1, y1), (x2, y2), (255, 255, 255), 3)
+    cv2.putText(frame, f"Density: {density}", (40, 60),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
 
-        cv2.line(frame, (0, LINE_CRITICAL), (width, LINE_CRITICAL), (0, 0, 255), 2)
-        cv2.line(frame, (0, LINE_HIGH), (width, LINE_HIGH), (0, 255, 255), 2)
-        cv2.line(frame, (0, LINE_NORMAL), (width, LINE_NORMAL), (0, 255, 0), 2)
-
-        cv2.putText(frame, f"Density: {density}", (40, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3)
-
-        # =====================================================
-        # FPS
-        # =====================================================
-        frame_counter += 1
-        elapsed = time.time() - start_time
-        fps = frame_counter / elapsed if elapsed > 0 else 0
-
-        # Convert for Streamlit
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        # =====================================================
-        # UPDATE UI
-        # =====================================================
-        video_placeholder.image(frame, channels="RGB", use_container_width=True)
-
-        vehicle_metric.metric("🚗 Vehicles", vehicle_count)
-        density_metric.metric("🚦 Density", density)
-        signal_metric.metric("⏱ Signal Time", f"{signal_time} sec")
-        fps_metric.metric("⚡ FPS", f"{fps:.2f}")
-
-        time.sleep(0.01)
-
-    cap.release()
+    # =====================================================
+    # UPDATE UI
+    # =====================================================
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    video_placeholder.image(frame, channels="RGB", use_container_width=True)
+    vehicle_metric.metric("🚗 Vehicles", vehicle_count)
+    density_metric.metric("🚦 Density", density)
+    signal_metric.metric("⏱ Signal Time", f"{signal_time} sec")
+    fps_metric.metric("⚡ FPS", "Image")
