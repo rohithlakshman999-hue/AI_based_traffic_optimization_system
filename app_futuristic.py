@@ -379,6 +379,12 @@ if start_button:
     else:
         frame_counter = 0
         start_time = time.time()
+        inference_stride = 3
+        cached_detections = []
+        density = "NORMAL"
+        signal_time = 30
+        ambulance_detected = False
+        right_lane_vehicle_count = 0
 
         while cap.isOpened():
             ret, frame = cap.read()
@@ -401,52 +407,47 @@ if start_button:
             LINE_CRITICAL = 100
             LINE_HIGH = 350
             LINE_NORMAL = 550
-            max_depth_right_lane = 0
-            right_lane_vehicle_count = 0
-            ambulance_detected = False
+            if frame_counter % inference_stride == 0:
+                max_depth_right_lane = 0
+                right_lane_vehicle_count = 0
+                ambulance_detected = False
+                cached_detections = []
+                results = model(frame, imgsz=640, verbose=False)[0]
 
-            results = model(frame, verbose=False)[0]
+                for box in results.boxes:
+                    cls = int(box.cls[0])
+                    label = model.names[cls]
 
-            for box in results.boxes:
-                cls = int(box.cls[0])
-                label = model.names[cls]
+                    if label in ["car", "truck", "bus", "motorcycle"] or "ambulance" in label.lower():
+                        if "ambulance" in label.lower():
+                            ambulance_detected = True
 
-                if label in ["car", "truck", "bus", "motorcycle"] or "ambulance" in label.lower():
-                    if "ambulance" in label.lower():
-                        ambulance_detected = True
+                        x_min, y_min, x_max, y_max = map(int, box.xyxy[0])
+                        center_x_vehicle = (x_min + x_max) // 2
+                        bottom_y = y_max
 
-                    x_min, y_min, x_max, y_max = map(int, box.xyxy[0])
-                    center_x_vehicle = (x_min + x_max) // 2
-                    bottom_y = y_max
+                        if (center_x_vehicle - x1) * (y2 - y1) - (bottom_y - y1) * (x2 - x1) > 0:
+                            right_lane_vehicle_count += 1
+                            max_depth_right_lane = max(max_depth_right_lane, bottom_y)
+                            cached_detections.append((x_min, y_min, x_max, y_max, label, float(box.conf[0])))
 
-                    if (center_x_vehicle - x1) * (y2 - y1) - (bottom_y - y1) * (x2 - x1) > 0:
-                        right_lane_vehicle_count += 1
-                        if bottom_y > max_depth_right_lane:
-                            max_depth_right_lane = bottom_y
+                if ambulance_detected:
+                    density, signal_time = "EMERGENCY", 90
+                elif max_depth_right_lane < LINE_CRITICAL:
+                    density, signal_time = "NORMAL", 30
+                elif max_depth_right_lane < LINE_HIGH:
+                    density, signal_time = "HIGH", 60
+                else:
+                    density, signal_time = "VERY HIGH", 90
 
-                        b_color = (0, 255, 0) if "ambulance" in label.lower() else (212, 182, 6) # Cyan in BGR
-                        cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), b_color, 2)
-                        
-                        conf_val = round(float(box.conf[0]) * 100, 1)
-                        cv2.rectangle(frame, (x_min, y_min - 20), (x_min + 100, y_min), b_color, -1)
-                        cv2.putText(frame, f"{label.upper()} {conf_val}%", (x_min + 5, y_min - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+            line_color = (0, 255, 0) if density in ["NORMAL", "EMERGENCY"] else ((0, 255, 255) if density == "HIGH" else (0, 0, 255))
 
-            if ambulance_detected:
-                density = "EMERGENCY"
-                signal_time = 90
-                line_color = (0, 255, 0)
-            elif max_depth_right_lane < LINE_CRITICAL:
-                density = "NORMAL"
-                signal_time = 30
-                line_color = (0, 255, 0)
-            elif max_depth_right_lane < LINE_HIGH:
-                density = "HIGH"
-                signal_time = 60
-                line_color = (0, 255, 255)
-            else:
-                density = "VERY HIGH"
-                signal_time = 90
-                line_color = (0, 0, 255)
+            for x_min, y_min, x_max, y_max, label, confidence in cached_detections:
+                b_color = (0, 255, 0) if "ambulance" in label.lower() else (212, 182, 6)
+                cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), b_color, 2)
+                conf_val = round(confidence * 100, 1)
+                cv2.rectangle(frame, (x_min, y_min - 20), (x_min + 100, y_min), b_color, -1)
+                cv2.putText(frame, f"{label.upper()} {conf_val}%", (x_min + 5, y_min - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
 
             cv2.line(frame, (x1, y1), (x2, y2), (255, 255, 255), 3)
             cv2.line(frame, (0, LINE_CRITICAL), (width, LINE_CRITICAL), (0, 0, 255), 1)
@@ -460,9 +461,10 @@ if start_button:
 
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            video_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
-            detection_status_ph.markdown(render_detection_status(density, signal_time, ambulance_detected), unsafe_allow_html=True)
-            performance_metrics_ph.markdown(render_performance_metrics(fps, right_lane_vehicle_count), unsafe_allow_html=True)
+            if frame_counter % inference_stride == 0:
+                video_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
+                detection_status_ph.markdown(render_detection_status(density, signal_time, ambulance_detected), unsafe_allow_html=True)
+                performance_metrics_ph.markdown(render_performance_metrics(fps, right_lane_vehicle_count), unsafe_allow_html=True)
 
             time.sleep(0.01)
 
