@@ -192,7 +192,7 @@ header_html = f"""
         <span class="badge" style="background: rgba(6, 182, 212, 0.1); border-color: rgba(6, 182, 212, 0.25); color: #06B6D4;">YOLOv8s</span>
         <span class="badge" style="background: rgba(249, 115, 22, 0.1); border-color: rgba(249, 115, 22, 0.25); color: #F97316;">PyTorch</span>
         <span class="badge" style="background: rgba(255, 75, 75, 0.1); border-color: rgba(255, 75, 75, 0.25); color: #FF4B4B;">Streamlit</span>
-        <span class="badge" style="background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.25); color: #22C55E;">HackZen 2026</span>
+        <span class="badge" style="background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.25); color: #22C55E;">SIH 2026</span>
     </div>
 </div>
 """
@@ -273,10 +273,21 @@ with col2:
 <div style="width: 20px; height: 20px; border-radius: 50%; background: rgba(129,140,248,0.15); color: #818CF8; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: bold;">J</div>
 <span style="font-size: 0.7rem; color: #cbd5e1;">Jeyabharathi S</span>
 </div>
-<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-<div style="width: 20px; height: 20px; border-radius: 50%; background: rgba(34,197,94,0.15); color: #22C55E; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: bold;">K</div>
-<span style="font-size: 0.7rem; color: #cbd5e1;">Kanishka Palanisamy</span>
+<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+<div style="width: 20px; height: 20px; border-radius: 50%; background: rgba(245,158,11,0.15); color: #F59E0B; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: bold;">M</div>
+<span style="font-size: 0.7rem; color: #cbd5e1;">Madhavan S</span>
 </div>
+<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+<div style="width: 20px; height: 20px; border-radius: 50%; background: rgba(236,72,153,0.15); color: #EC4899; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: bold;">B</div>
+<span style="font-size: 0.7rem; color: #cbd5e1;">Bavanraj M</span>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+<div style="width: 20px; height: 20px; border-radius: 50%; background: rgba(168,85,247,0.15); color: #A855F7; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: bold;">R</div>
+<span style="font-size: 0.7rem; color: #cbd5e1;">Ramadharshini G</span>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+<div style="width: 20px; height: 20px; border-radius: 50%; background: rgba(168,85,247,0.15); color: #A855F7; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: bold;">R</div>
+<span style="font-size: 0.7rem; color: #cbd5e1;">Kanishka Palanisamy</span>
 </div>
 </div>
     """, unsafe_allow_html=True)
